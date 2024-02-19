@@ -1,25 +1,42 @@
 use std::io::{stdin, stdout, Write};
 use std::process::Command;
+use std::path::Path;
+use std::env;
 
 fn main(){
     loop {
-        // use the `>` character as the prompt
-        // need to explicitly flush this to ensure it prints before read_line
         print!("> ");
-        //Ignoring the result of stdout().flush()
         let _ = stdout().flush();
 
         let mut input = String::new();
         stdin().read_line(&mut input).unwrap();
 
-        let command = input.trim();
+        let mut parts = input.trim().split_whitespace();
+        let command = parts.next().unwrap();
+        let args = parts;
 
-        let mut child = Command::new(command)
-            .spawn()
-            .unwrap();
+        match command {
+            "cd" => {
+                let new_dir = args.peekable().peek().map_or("/", |x| *x);
+                let root = Path::new(new_dir);
+                if let Err(e) = env::set_current_dir(&root) {
+                    eprintln!("{}", e);
+                }
+            },
+            "exit" => return,
+            command => {
+                let child = Command::new(command)
+                    .args(args)
+                    .spawn();
 
-        // don't accept another command until this one completes
-        //Ignoring the result of child.wait()
-        let _ = child.wait();
+                // gracefully handle malformed user input
+                match child {
+                    Ok(mut child) => {
+                            let _ = child.wait();
+                        },
+                    Err(e) => eprintln!("{}", e),
+                };
+            }
+        }
     }
 }
